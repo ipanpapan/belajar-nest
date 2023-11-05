@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -12,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { BooksService } from './books.service';
 import { CreateBooksRequestDto } from './dto/create-books-request.dto';
+import { Book } from './entity/book.entity';
 import { UpdateBookRequestDto } from './dto/update-book-request.dto';
 
 @Controller('books')
@@ -19,32 +21,37 @@ export class BooksController {
   constructor(private readonly booksService: BooksService) {}
 
   @Get()
-  getBooks(
+  async getBooks(
     @Query('title') title: string,
     @Query('author') author: string,
     @Query('category') category: string,
-  ) {
-    return this.booksService.getBooks(title, author, category);
+    @Query('year') year: number,
+  ): Promise<Book[]> {
+    return this.booksService.getBooks(title, author, category, year);
   }
 
   @Get('/:id')
-  readSingle(@Param('id') id: string) {
-    return this.booksService.getSingleBook(id);
+  async getBookById(@Param('id', ParseIntPipe) id: bigint): Promise<Book> {
+    return this.booksService.getBookById(id);
   }
 
   @Post()
   @UsePipes(new ValidationPipe())
-  create(@Body() request: CreateBooksRequestDto) {
-    return this.booksService.createBooks(request);
+  async create(@Body() request: CreateBooksRequestDto): Promise<Book> {
+    return this.booksService.createBook(request);
   }
 
   @Put('/:id')
-  update(@Param('id') id: string, @Body() request: UpdateBookRequestDto) {
-    return this.booksService.updateBooks(id, request);
+  @UsePipes(ValidationPipe)
+  update(
+    @Param('id', ParseIntPipe) id: bigint,
+    @Body() request: UpdateBookRequestDto,
+  ) {
+    return this.booksService.updateBook(id, request);
   }
 
   @Delete('/:id')
-  delete(@Param('id') id: string) {
+  delete(@Param('id', ParseIntPipe) id: bigint) {
     return this.booksService.deleteBook(id);
   }
 }

@@ -1,99 +1,116 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { v4 } from 'uuid';
+import { Book } from './entity/book.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateBooksRequestDto } from './dto/create-books-request.dto';
 import { UpdateBookRequestDto } from './dto/update-book-request.dto';
 
 @Injectable()
 export class BooksService {
-  private books = [
-    {
-      id: v4(),
-      title: 'book satu',
-      author: 'author satu',
-      category: 'category satu',
-      year: 1234,
+  customBookRepository = this.bookRepository.extend({
+    findByQueryParameter(
+      title: string,
+      author: string,
+      category: string,
+      year: number,
+    ) {
+      const query = this.createQueryBuilder('book');
+
+      if (title) {
+        query.andWhere('book.title LIKE :title', {
+          title: `%${title}%`,
+        });
+      }
+
+      if (author) {
+        query.andWhere('book.author LIKE :author', {
+          author: `%${author}%`,
+        });
+      }
+
+      if (category) {
+        query.andWhere('book.category LIKE :category', {
+          category: `%${category}%`,
+        });
+      }
+
+      if (year) {
+        query.andWhere('book.year = :year', { year });
+      }
+
+      return query.getMany();
     },
-    {
-      id: v4(),
-      title: 'book dua',
-      author: 'author dua',
-      category: 'category dua',
-      year: 1235,
-    },
-  ];
+  });
 
-  getBooks(title: string, author: string, category: string): any[] {
-    return this.books.filter((oneBook) => {
-      let isMatch = true;
+  constructor(
+    @InjectRepository(Book)
+    private readonly bookRepository: Repository<Book>,
+  ) {}
 
-      if (title && title != oneBook.title) {
-        isMatch = false;
-      }
+  async getBooks(
+    title: string,
+    author: string,
+    category: string,
+    year: number,
+  ): Promise<Book[]> {
+    return this.customBookRepository.findByQueryParameter(
+      title,
+      author,
+      category,
+      year,
+    );
+  }
 
-      if (author && author != oneBook.author) {
-        isMatch = false;
-      }
+  async getBookById(id: bigint): Promise<Book> {
+    const book = await this.bookRepository.findOneBy({
+      id,
+    });
 
-      if (category && category != oneBook.category) {
-        isMatch = false;
-      }
+    if (!book) {
+      throw new NotFoundException('book');
+    }
 
-      return isMatch;
+    return book;
+  }
+
+  async createBook(request: CreateBooksRequestDto): Promise<Book> {
+    return await this.bookRepository.manager.transaction(async (manager) => {
+      const book = this.bookRepository.create();
+      book.title = request.title;
+      book.author = request.author;
+      book.category = request.category;
+      book.year = request.year;
+
+      return await manager.save(book);
     });
   }
 
-  getSingleBook(id: string): any {
-    const bookIndex = this.findBooksIndexById(id);
+  async updateBook(id: bigint, request: UpdateBookRequestDto): Promise<Book> {
+    return await this.bookRepository.manager.transaction(async (manager) => {
+      const book = await manager.findOneBy(Book, { id });
 
-    if (bookIndex === -1) {
-      throw new NotFoundException('book');
-    }
+      if (!book) {
+        throw new NotFoundException('book');
+      }
 
-    return this.books[bookIndex];
+      book.year = request.year;
+      book.author = request.author;
+      book.title = request.title;
+      book.category = request.category;
+
+      return manager.save(book);
+    });
   }
 
-  createBooks(request: CreateBooksRequestDto): any {
-    const newBook = {
-      id: v4(),
-      title: request.title,
-      author: request.author,
-      category: request.category,
-      year: request.year,
-    };
+  async deleteBook(id: bigint): Promise<void> {
+    return await this.bookRepository.manager.transaction(async (manager) => {
+      const book = await manager.findOneBy(Book, { id });
 
-    this.books.push(newBook);
+      if (!book) {
+        throw new NotFoundException('book');
+      }
 
-    return newBook;
-  }
-
-  updateBooks(id: string, request: UpdateBookRequestDto): any {
-    const bookIndex = this.findBooksIndexById(id);
-
-    if (bookIndex === -1) {
-      throw new NotFoundException('book');
-    }
-
-    this.books[bookIndex].title = request.title;
-    this.books[bookIndex].author = request.author;
-    this.books[bookIndex].category = request.category;
-    this.books[bookIndex].year = request.year;
-
-    return this.books[bookIndex];
-  }
-
-  deleteBook(id: string) {
-    const bookIndex = this.findBooksIndexById(id);
-
-    if (bookIndex < 0) {
-      throw new NotFoundException('book');
-    }
-
-    this.books.splice(bookIndex, 1);
-  }
-
-  private findBooksIndexById(id: string): number {
-    return this.books.findIndex((book) => {
-      return book.id === id;
+      await manager.remove(book);
     });
   }
 }

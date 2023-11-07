@@ -1,6 +1,7 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { Book } from '../books/entity/book.entity';
 import { User } from '../users/entities/user.entity';
+import { RefreshToken } from '../auth/entities/refresh-token.entity';
 
 export const typeOrmConfig: TypeOrmModuleOptions = {
   type: 'mysql',
@@ -9,6 +10,6 @@ export const typeOrmConfig: TypeOrmModuleOptions = {
   username: 'sql12658933',
   password: 'AuMrbdwUxa',
   database: 'sql12658933',
-  entities: [Book, User],
+  entities: [Book, User, RefreshToken],
   synchronize: true,
 };
